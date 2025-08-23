@@ -98,12 +98,12 @@ if quality_report:
         
         col1, col2 = st.columns(2)
         with col1:
-            st.metric("Total de Registros", quality_report['quality_summary']['total_records'])
+            st.metric("Total de Registros", quality_report['sumario_qualidade']['total_registros'])
         with col2:
-            st.metric("Gerado em", pd.to_datetime(quality_report['generated_at']).strftime('%d/%m/%Y %H:%M:%S'))
+            st.metric("Gerado em", pd.to_datetime(quality_report['gerado_em']).strftime('%d/%m/%Y %H:%M:%S'))
 
         st.subheader("Percentual de Nulos por Coluna")
-        null_ratios = quality_report['quality_summary']['null_percentage_per_column']
+        null_ratios = quality_report['sumario_qualidade']['percentual_nulos_por_coluna']
         st.dataframe(pd.DataFrame.from_dict(null_ratios, orient='index', columns=['Percentual de Nulos']), use_container_width=True)
     except KeyError as e:
         st.error(f"Erro no formato do relatório de qualidade: chave {e} não encontrada.")

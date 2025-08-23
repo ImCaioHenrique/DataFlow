@@ -1,9 +1,9 @@
 {
-    "generated_at": "2025-08-23T11:49:57.685551",
-    "data_source": "data/lake/launches",
-    "quality_summary": {
-        "total_records": 111,
-        "null_percentage_per_column": {
+    "gerado_em": "2025-08-23T12:43:05.218343",
+    "fonte_dados": "data/lake/launches",
+    "sumario_qualidade": {
+        "total_registros": 111,
+        "percentual_nulos_por_coluna": {
             "flight_number": "0.00%",
             "launch_date_utc": "0.00%",
             "rocket.rocket_id": "0.00%",
@@ -16,7 +16,7 @@
             "cost_in_brl": "1.80%",
             "year": "0.00%"
         },
-        "data_types": {
+        "tipos_de_dados": {
             "flight_number": "int64",
             "launch_date_utc": "datetime64[ns]",
             "rocket.rocket_id": "object",
@@ -29,7 +29,7 @@
             "cost_in_brl": "float64",
             "year": "category"
         },
-        "range_checks": {
+        "verificacao_de_intervalo": {
             "flight_number": {
                 "min": 1.0,
                 "max": 110.0
@@ -76,7 +76,7 @@
             }
         }
     },
-    "descriptive_statistics": {
+    "estatisticas_descritivas": {
         "flight_number": {
             "count": 111.0,
             "mean": 55.990990990990994,
@@ -99,8 +99,8 @@
         },
         "exchange_rate": {
             "count": 109.0,
-            "mean": 3.66333119266055,
-            "std": 1.0209823962549271,
+            "mean": 3.6633110091743117,
+            "std": 1.020990546927205,
             "min": 1.5637,
             "25%": 3.1436,
             "50%": 3.6094,
@@ -109,8 +109,8 @@
         },
         "cost_in_brl": {
             "count": 109.0,
-            "mean": 185035925.6880734,
-            "std": 61398569.639217764,
+            "mean": 185034916.51376146,
+            "std": 61398939.48872743,
             "min": 10476790.0,
             "25%": 157180000.0,
             "50%": 182850000.0,

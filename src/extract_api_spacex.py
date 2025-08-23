@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import time
 import pyarrow as pa
 import pyarrow.parquet as pq
+import shutil
 
 # --- Funções de Extração da API SpaceX ---
 
@@ -40,9 +41,9 @@ def get_exchange_rate_for_date(date):
     if date_key in exchange_rate_cache:
         return exchange_rate_cache[date_key]
 
-    # print(f"Buscando cotação para data base: {date_key}")
+    print(f"Buscando cotação para data base: {date_key}")
     current_date = date
-    for attempt in range(5):  # Tenta a data e os 4 dias anteriores
+    for attempt in range(5):
         formatted_date_for_api = current_date.strftime('%Y-%m-%d')
         api_url = f"https://api.frankfurter.app/{formatted_date_for_api}?from=USD&to=BRL"
         
@@ -52,20 +53,20 @@ def get_exchange_rate_for_date(date):
                 data = response.json()
                 rate = data.get('rates', {}).get('BRL')
                 if rate:
-                    # print(f"  Sucesso! Cotação encontrada para {formatted_date_for_api}: {rate}")
+                    print(f"  Sucesso! Cotação encontrada para {formatted_date_for_api}: {rate}")
                     exchange_rate_cache[date_key] = rate
                     return rate
-            # else:
-                 # print(f"  Falha na API para {formatted_date_for_api}: Status {response.status_code}. (Tentativa {attempt+1}/5)")
+            else:
+                print(f"  Falha na API para {formatted_date_for_api}: Status {response.status_code}. (Tentativa {attempt+1}/5)")
 
         except requests.exceptions.RequestException:
-            # print(f"  Erro de conexão para {formatted_date_for_api}. (Tentativa {attempt+1}/5)")
+            print(f"  Erro de conexão para {formatted_date_for_api}. (Tentativa {attempt+1}/5)")
             pass
         
         time.sleep(0.1)
         current_date -= timedelta(days=1)
 
-    # print(f"x Falha total em encontrar cotação para data base: {date_key}")
+    print(f"x Falha total em encontrar cotação para data base: {date_key}")
     exchange_rate_cache[date_key] = None
     return None
 
@@ -108,8 +109,14 @@ def main():
     # 3. CARREGAMENTO (LOAD)
     print("\n--- Iniciando Processo de Carregamento ---")
     
-    # Saída 1: Data Lake em Parquet Particionado (Oficial)
+    # Saída 1: Data Lake em Parquet Particionado (Idempotente)
     lake_path = "data/lake/launches"
+    
+    # Remove o diretório antigo para garantir a idempotência
+    if os.path.exists(lake_path):
+        print(f"Removendo diretório do lake existente em: {lake_path}")
+        shutil.rmtree(lake_path)
+    
     print(f"Salvando dados no Data Lake em: {lake_path}")
     final_df['launch_date_utc'] = final_df['launch_date_utc'].dt.tz_localize(None)
     table = pa.Table.from_pandas(final_df, preserve_index=False)
