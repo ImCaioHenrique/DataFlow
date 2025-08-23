@@ -3,6 +3,8 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 import time
+import pyarrow as pa
+import pyarrow.parquet as pq
 
 # --- Funções de Extração da API SpaceX ---
 
@@ -38,7 +40,7 @@ def get_exchange_rate_for_date(date):
     if date_key in exchange_rate_cache:
         return exchange_rate_cache[date_key]
 
-    print(f"Buscando cotação para data base: {date_key}")
+    # print(f"Buscando cotação para data base: {date_key}")
     current_date = date
     for attempt in range(5):  # Tenta a data e os 4 dias anteriores
         formatted_date_for_api = current_date.strftime('%Y-%m-%d')
@@ -50,25 +52,25 @@ def get_exchange_rate_for_date(date):
                 data = response.json()
                 rate = data.get('rates', {}).get('BRL')
                 if rate:
-                    print(f"  Sucesso! Cotação encontrada para {formatted_date_for_api}: {rate}")
+                    # print(f"  Sucesso! Cotação encontrada para {formatted_date_for_api}: {rate}")
                     exchange_rate_cache[date_key] = rate
                     return rate
-                else:
-                    print(f"  API não retornou cotação para {formatted_date_for_api}. (Fim de semana/feriado? Tentativa {attempt+1}/5)")
-            else:
-                 print(f"  Falha na API para {formatted_date_for_api}: Status {response.status_code}. (Tentativa {attempt+1}/5)")
+            # else:
+                 # print(f"  Falha na API para {formatted_date_for_api}: Status {response.status_code}. (Tentativa {attempt+1}/5)")
 
-        except requests.exceptions.RequestException as e:
-            print(f"  Erro de conexão para {formatted_date_for_api}: {e}. (Tentativa {attempt+1}/5)")
+        except requests.exceptions.RequestException:
+            # print(f"  Erro de conexão para {formatted_date_for_api}. (Tentativa {attempt+1}/5)")
+            pass
         
-        time.sleep(0.2)
+        time.sleep(0.1)
         current_date -= timedelta(days=1)
 
-    print(f"x Falha total em encontrar cotação para data base: {date_key}")
+    # print(f"x Falha total em encontrar cotação para data base: {date_key}")
     exchange_rate_cache[date_key] = None
     return None
 
 # --- Orquestração do Script ---
+
 def main():
     """Função principal para orquestrar o processo de ETL."""
     
@@ -80,9 +82,10 @@ def main():
     # 2. TRANSFORMAÇÃO
     print("\n--- Iniciando Processo de Transformação ---")
     launches_df['launch_date_utc'] = pd.to_datetime(launches_df['launch_date_utc'], utc=True)
+    launches_df['year'] = launches_df['launch_date_utc'].dt.year
     launches_df['year_month'] = launches_df['launch_date_utc'].dt.strftime('%Y-%m')
 
-    launches_df = launches_df[['flight_number', 'launch_date_utc', 'rocket.rocket_id', 'launch_success', 'year_month']]
+    launches_df = launches_df[['flight_number', 'launch_date_utc', 'rocket.rocket_id', 'launch_success', 'year', 'year_month']]
     rockets_df = rockets_df[['rocket_id', 'rocket_name', 'cost_per_launch']]
 
     print("Juntando dados de lançamentos e foguetes...")
@@ -94,29 +97,38 @@ def main():
         how='left'
     )
 
-    print("\nBuscando cotações do dólar (USD->BRL) para cada lançamento (isso pode levar alguns minutos)...")
+    print("Buscando cotações do dólar (USD->BRL) para cada lançamento (isso pode levar alguns minutos)...")
     merged_df['exchange_rate'] = merged_df['launch_date_utc'].dt.tz_localize(None).apply(get_exchange_rate_for_date)
     
-    print("\nCalculando custo em BRL...")
+    print("Calculando custo em BRL e limpando dados...")
     merged_df['cost_in_brl'] = merged_df['cost_per_launch'] * merged_df['exchange_rate']
     merged_df['cost_in_brl'] = merged_df['cost_in_brl'].round(2)
+    final_df = merged_df.copy()
 
     # 3. CARREGAMENTO (LOAD)
     print("\n--- Iniciando Processo de Carregamento ---")
-    output_path = "data/launches.xlsx"
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
+    
+    # Saída 1: Data Lake em Parquet Particionado (Oficial)
+    lake_path = "data/lake/launches"
+    print(f"Salvando dados no Data Lake em: {lake_path}")
+    final_df['launch_date_utc'] = final_df['launch_date_utc'].dt.tz_localize(None)
+    table = pa.Table.from_pandas(final_df, preserve_index=False)
+    pq.write_to_dataset(
+        table,
+        root_path=lake_path,
+        partition_cols=['year']
+    )
 
-    # Remove timezone para salvar em Excel
-    merged_df['launch_date_utc'] = merged_df['launch_date_utc'].dt.tz_localize(None)
-
-    print(f"Salvando dados em arquivo Excel: {output_path}")
+    # Saída 2: Arquivo Excel para Análise Rápida
+    excel_path = "data/launches_for_analysis.xlsx"
+    print(f"Salvando arquivo Excel para análise em: {excel_path}")
     try:
-        merged_df.to_excel(output_path, index=False, engine='openpyxl')
-        print("\n--- Processo Concluído com Sucesso! ---")
-        print(f"Arquivo salvo em: {os.path.abspath(output_path)}")
+        final_df.to_excel(excel_path, index=False, engine='openpyxl')
     except ImportError:
-        print("erro" )
-        
+        print("\nAVISO: A biblioteca 'openpyxl' não está instalada. A exportação para Excel foi ignorada.")
+        print("Para habilitar, execute: pip install openpyxl")
+
+    print("\n--- Processo Concluído com Sucesso! ---")
 
 if __name__ == "__main__":
     main()
